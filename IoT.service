@@ -1,0 +1,13 @@
+[Unit]
+Description=Text
+After=network.target
+After=syslog.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/home/test1/Dev/IoT_code
+ExecStart=/home/test1/Dev/IoT_code/client.py
+
+[Install]
+WantedBy=multi-user.target
