@@ -8,11 +8,12 @@ import sys
 import glob
 import logging
 import logging.handlers
+import time
 
 if not os.getegid() == 0:
     sys.exit('Script must be run as root')
 
-from time import sleep
+#from time import sleep
 from pyA20.gpio import gpio
 from pyA20.gpio import port
 from os.path import dirname, abspath
@@ -65,9 +66,9 @@ my_logger.addHandler(handler)
 sock = socket.socket()
 sock.bind(('', 8888))
 sock.listen(2)
-lcd.lcd_init()
-lcd.lcd_string("Ah, shit",LCD_LINE_1)
-lcd.lcd_string("Here we go again",LCD_LINE_2)
+#lcd.lcd_init()
+#lcd.lcd_string("Ah, shit",LCD_LINE_1)
+#lcd.lcd_string("Here we go again",LCD_LINE_2)
 
 def get_data(connection):
     data = connection.recv(1024).decode().strip()
@@ -77,6 +78,15 @@ def get_data(connection):
 def log_write(data):
     for message in data:
         my_logger.debug(message + '\n')
+
+while True:
+    if (sock.accept()):
+        break
+    else:
+        lcd.lcd_init()
+        lcd.lcd_string("Ah, shit",LCD_LINE_1)
+        lcd.lcd_string("Here we go again",LCD_LINE_2)
+        time.sleep(2)
 
 while True:
     conn, addr = sock.accept()
