@@ -66,9 +66,31 @@ my_logger.addHandler(handler)
 sock = socket.socket()
 sock.bind(('', 8888))
 sock.listen(2)
-#lcd.lcd_init()
-#lcd.lcd_string("Ah, shit",LCD_LINE_1)
-#lcd.lcd_string("Here we go again",LCD_LINE_2)
+lcd.lcd_init()
+lcd.lcd_string("Ah, shit",LCD_LINE_1)
+lcd.lcd_string("Here we go again",LCD_LINE_2)
+
+class device(object):
+
+    def __init__(self, number, temperature, humidity):
+        self.t_range = [25.0, 25.0, 25.0, 25.0, 25.0]
+        self.h_range = [28.0, 28.0, 28.0, 28.0, 28.0]
+        self.number = number
+        self.t_range[0] = temperature
+        self.t_range[0] = humidity
+        self.t_avg = sum(self.t_range) / len(self.t_range)
+        self.h_avg = sum(self.h_range) / len(self.h_range)
+        self.curr_indication = 1
+
+    def update(self, temperature, humidity):
+        self.t_range[self.curr_indication] = temperature
+        self.h_range[self.curr_indication] = humidity
+        if (self.curr_indication == 4):
+            self.curr_indication = 0
+        else:
+            self.curr_indication += 1
+        self.t_avg = sum(self.t_range) / len(self.t_range)
+        self.h_avg = sum(self.h_range) / len(self.h_range)       
 
 def get_data(connection):
     data = connection.recv(1024).decode().strip()
@@ -79,32 +101,70 @@ def log_write(data):
     for message in data:
         my_logger.debug(message + '\n')
 
+def parser(data): #TODO remove t_str, h_str
+    number = int(data[8:9])
+    t_str = data[11:20]
+    h_str = data[22:31]
+    t_float = float(t_str[4:9])
+    h_float = float(h_str[4:9])
+    return number, t_float, h_float
+
+def led_checker(average_temp, average_humid):
+    if ((average_temp < 20) or (average_temp > 30)):
+        gpio.output(led, 1)
+    elif ((average_humid < 20) or (average_humid > 55)):
+        gpio.output(led, 1)
+    else:
+        gpio.output(led, 0)
+
+'''
 while True:
-    if (sock.accept()):
+    conn, addr = sock.accept()
+    if (): #TODO check for the connection
+        conn.close()
         break
     else:
         lcd.lcd_init()
         lcd.lcd_string("Ah, shit",LCD_LINE_1)
         lcd.lcd_string("Here we go again",LCD_LINE_2)
         time.sleep(2)
+'''
+
+#Current data example:
+#Sensor #1. T = 25.80; H = 26.40
+devices = []
 
 while True:
+    isNew = True
     conn, addr = sock.accept()
     print('connected:', addr)
     data = get_data(conn)
-    temperature_str = data[11:20]
-    humidity_str = data[22:31]
-    temperature_float = float(temperature_str[4:9])
-    humidity_float = float(humidity_str[4:9])
-    if (temperature_float > 30):
-        gpio.output(led, 1)
-    elif (humidity_float > 55):
-        gpio.output(led, 1)
-    else:
-        gpio.output(led, 0)
+    number, temperature_float, humidity_float = parser(data)
+    
+    for each in devices:
+        if (each.number == number):
+            isNew = False
+            each.update(temperature_float, humidity_float)
+
+    if (isNew):
+        new = device(number, temperature_float, humidity_float)
+        devices.append(new)
+
     log_write([data])
     conn.close()
     print('diconnected:', addr)
+
+    average_temp = average_humid = 0
+    for each in devices:
+        average_temp += each.t_avg
+        average_humid += each.h_avg
+    average_temp = round(average_temp / len(devices), 2)
+    average_humid = round(average_humid / len(devices), 2)
+    
+    led_checker(average_temp, average_humid)
+    
     lcd.lcd_init()
-    lcd.lcd_string(temperature_str, LCD_LINE_1)
-    lcd.lcd_string(humidity_str, LCD_LINE_2)
+    lcd.lcd_string("T = " + str(average_temp), LCD_LINE_1)
+    lcd.lcd_string("H = " + str(average_humid), LCD_LINE_2)
+    
+    time.sleep(3)
